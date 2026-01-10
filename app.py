@@ -68,7 +68,9 @@ def get_gs_client() -> gspread.Client:
 
     # ========for streamlit cloude only========================================
     # Load credentials from Streamlit secrets
+    
     creds = Credentials.from_service_account_info(st.secrets["google_credentials"], scopes=SCOPES)
+    
     # ===========for streamlit cloude only=====================================
 
 
@@ -191,6 +193,33 @@ def show_record_table(record: pd.Series):
     df_display = pd.DataFrame([record[HEADERS].to_dict()])
     st.dataframe(df_display, use_container_width=True)
 
+def skull_trait_radio(title: str, male_label: str, female_label: str, default: str = ""):
+    st.markdown(f"### {title}")
+
+    options = {
+        "": "",
+        "M": male_label,
+        "F": female_label,
+    }
+
+    # detect default key from stored value
+    default_key = ""
+    for k, v in options.items():
+        if v == default:
+            default_key = k
+
+    choice_key = st.radio(
+        label="",
+        options=list(options.keys()),
+        index=list(options.keys()).index(default_key),
+        format_func=lambda k: options[k] if k else "Not selected",
+        label_visibility="collapsed"
+    )
+
+    # ✅ return FULL TEXT (not just M/F)
+    return options.get(choice_key, "")
+
+
 
 def render_create_or_edit_form(*, mode: str, ws: gspread.Worksheet, df: pd.DataFrame, defaults: Dict[str, str], row_number: Optional[int] = None):
     is_create = mode == "create"
@@ -200,29 +229,59 @@ def render_create_or_edit_form(*, mode: str, ws: gspread.Worksheet, df: pd.DataF
 
         sl_no = next_sl_no(df) if is_create else defaults.get("SL NO", "")
 
-        with col1:
-            st.text_input("SL NO", value=str(sl_no), disabled=True)
-            architecture = st.text_input("ARCHITECTURE OF THE SKULL", value=defaults.get("ARCHITECTURE OF THE SKULL", ""))
-            occipital_condyles = st.text_input("OCCIPITAL CONDYLES", value=defaults.get("OCCIPITAL CONDYLES", ""))
-            mastoid_process = st.text_input("MASTOID PROCESS", value=defaults.get("MASTOID PROCESS", ""))
-            occipital_protuberance = st.text_input("OCCIPITAL PROTUBERANCE", value=defaults.get("OCCIPITAL PROTUBERANCE", ""))
-            palatal_width = st.text_input("PALATAL WIDTH", value=defaults.get("PALATAL WIDTH", ""))
-        with col2:
-            ap = st.text_input("AP", value=defaults.get("AP", ""))
-            td = st.text_input("TD", value=defaults.get("TD", ""))
-            preview = ""
-            if ap and td:
-                try:
-                    ap_v, td_v = float(ap), float(td)
-                    if td_v != 0:
-                        preview = f"{ap_v / td_v}"
-                except ValueError:
-                    preview = ""
-            st.text_input("AP/TD", value=preview, disabled=True, help="Auto-calculated from AP and TD")
+       
+        st.text_input("SL NO", value=str(sl_no), disabled=True)
 
-            file_name = st.text_input("FILE NAME", value=defaults.get("FILE NAME", ""), disabled=is_create)
-            shape = st.selectbox("SHAPE", options=["", "Round", "Oval"], index=["", "Round", "Oval"].index(defaults.get("SHAPE", "") if defaults.get("SHAPE", "") in ["Round", "Oval"] else ""))
-            image_hash_key = st.text_input("IMAGE HASH KEY", value=defaults.get("IMAGE HASH KEY", ""), disabled=True)
+        architecture = skull_trait_radio(
+            title="Architecture of the Skull",
+            male_label="M: Thick cortical bone, coarse texture",
+            female_label="F: Thin cortical bone, smooth texture",
+            default=defaults.get("ARCHITECTURE OF THE SKULL", "")
+        )
+
+        occipital_condyles = skull_trait_radio(
+            title="Occipital Condyles",
+            male_label="M: Broader",
+            female_label="F: Narrower",
+            default=defaults.get("OCCIPITAL CONDYLES", "")
+        )
+
+        mastoid_process = skull_trait_radio(
+            title="Mastoid Process (Porion)",
+            male_label="M: Long, robust (>28 mm)",
+            female_label="F: Short, delicate (<26 mm)",
+            default=defaults.get("MASTOID PROCESS", "")
+        )
+
+        occipital_protuberance = skull_trait_radio(
+            title="Occipital Protuberance (Inion)",
+            male_label="M: Pronounced, rugose",
+            female_label="F: Smooth, faint",
+            default=defaults.get("OCCIPITAL PROTUBERANCE", "")
+        )
+
+        palatal_width = skull_trait_radio(
+        title="Palatal Width",
+        male_label="M: Broad, U-shaped (>29 mm)",
+        female_label="F: Narrow, parabolic (<29 mm)",
+        default=defaults.get("PALATAL WIDTH", "")
+    )
+
+        ap = st.text_input("AP", value=defaults.get("AP", ""))
+        td = st.text_input("TD", value=defaults.get("TD", ""))
+        preview = ""
+        if ap and td:
+            try:
+                ap_v, td_v = float(ap), float(td)
+                if td_v != 0:
+                    preview = f"{ap_v / td_v}"
+            except ValueError:
+                preview = ""
+        st.text_input("AP/TD", value=preview, disabled=True, help="Auto-calculated from AP and TD")
+
+        file_name = st.text_input("FILE NAME", value=defaults.get("FILE NAME", ""), disabled=is_create)
+        shape = st.selectbox("SHAPE", options=["", "Round", "Oval"], index=["", "Round", "Oval"].index(defaults.get("SHAPE", "") if defaults.get("SHAPE", "") in ["Round", "Oval"] else ""))
+        image_hash_key = st.text_input("IMAGE HASH KEY", value=defaults.get("IMAGE HASH KEY", ""), disabled=True)
 
         submitted = st.form_submit_button("Save to Google Sheet")
 
