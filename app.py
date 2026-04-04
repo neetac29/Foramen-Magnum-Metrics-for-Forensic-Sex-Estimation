@@ -239,7 +239,8 @@ def show_record_table(record: pd.Series):
     if "IMAGE URL" in df_display.columns:
         def make_clickable(url):
             if url:
-                return f'<a href="{url}" target="_blank">🔗 View</a> | <a href="{url}" download>⬇ Download</a>'
+                download_url = url.replace("/upload/", "/upload/fl_attachment/")
+                return f'<a href="{url}" target="_blank">👁 View</a> | <a href="{download_url}" target="_blank">📥 Download</a>'
             return ""
 
         df_display["IMAGE URL"] = df_display["IMAGE URL"].apply(make_clickable)
