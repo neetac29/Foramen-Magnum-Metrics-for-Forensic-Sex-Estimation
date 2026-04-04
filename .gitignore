@@ -1,3 +1,3 @@
 # Ignore Google Sheets credentials
-google_credentials.json
+
 .streamlit/secrets.toml

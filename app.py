@@ -37,11 +37,6 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive",
 ]
 
-#  ===============for local run only ======================================================
-# SERVICE_ACCOUNT_FILE = "google_credentials.json"
-#  ===============for local run only ======================================================
-
-
 
 
 st.set_page_config(page_title="Skull Shapes – Forensic Sex Estimation", page_icon="🦴", layout="centered")
@@ -67,15 +62,11 @@ if "postsave_sl_no" not in st.session_state:
 # ==============================
 @st.cache_resource(show_spinner=False)
 def get_gs_client() -> gspread.Client:
-    # for local run
-    # creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
-
-    # ========for streamlit cloude only========================================
-    # Load credentials from Streamlit secrets
-    
-    creds = Credentials.from_service_account_info(st.secrets["google_credentials"], scopes=SCOPES)
-    
-    # ===========for streamlit cloude only=====================================
+  
+    creds = Credentials.from_service_account_info(
+    st.secrets["google_credentials"],
+    scopes=SCOPES
+)
 
 
     return gspread.authorize(creds)

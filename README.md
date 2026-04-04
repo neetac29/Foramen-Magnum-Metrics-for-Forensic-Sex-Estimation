@@ -33,19 +33,6 @@ mandible shape-based sex estimation tool
 6. Google credentials setup (local run)
 
 
-Uncomment  this code in your app.py file:
-
-    1.  SERVICE_ACCOUNT_FILE = "google_credentials.json"
-
-    2.   creds = Credentials.from_service_account_file(
-        SERVICE_ACCOUNT_FILE, scopes=SCOPES
-    )
-
-Comment this code in your app.py file:
-
-    creds = Credentials.from_service_account_info(st.secrets["google_credentials"], scopes=SCOPES)
-
-
 # Make sure:
 
 google_credentials.json is in the same folder
