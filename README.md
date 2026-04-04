@@ -4,30 +4,47 @@ mandible shape-based sex estimation tool
 
 
 # Steps to Run App on local 
-1. Create virtual environment (recommended)
-    
-    python -m venv venv
+1. Delete the broken virtual environment
 
-2. To Activate - ( Mac / Linux )
+    Inside your project folder, run:
+        
+        rm -rf venv
+
+2. Create a fresh virtual environment (recommended) Use python3:
+    
+    python3 -m venv venv
+
+3. To Activate - ( Mac / Linux )
 
     source venv/bin/activate
 
-2. To Activate on ( Windows )
+3. To Activate on ( Windows )
 
     venv\Scripts\activate
 
-4. Install dependencies
+4. Upgrade pip (recommended)
+
+     pip install --upgrade pip
+
+5. Install dependencies
 
     pip install -r requirements.txt
 
-5. Google credentials setup (local run)
+6. Google credentials setup (local run)
 
-Uncomment this in your code:
-    SERVICE_ACCOUNT_FILE = "google_credentials.json"
-And replace:
-        creds = Credentials.from_service_account_file(
+
+Uncomment  this code in your app.py file:
+
+    1.  SERVICE_ACCOUNT_FILE = "google_credentials.json"
+
+    2.   creds = Credentials.from_service_account_file(
         SERVICE_ACCOUNT_FILE, scopes=SCOPES
     )
+
+Comment this code in your app.py file:
+
+    creds = Credentials.from_service_account_info(st.secrets["google_credentials"], scopes=SCOPES)
+
 
 # Make sure:
 

@@ -12,7 +12,7 @@ from google.oauth2.service_account import Credentials
 # ==============================
 # CONFIG
 # ==============================
-SHEET_TITLE = "skull_shapes"
+SHEET_TITLE = "BOSSFM"
 HEADERS: List[str] = [
     "SL NO",
     "ARCHITECTURE OF THE SKULL",
