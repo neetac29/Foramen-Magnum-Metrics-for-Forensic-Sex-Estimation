@@ -9,6 +9,9 @@ import imagehash
 import gspread
 from google.oauth2.service_account import Credentials
 
+import cloudinary
+import cloudinary.uploader
+
 # ==============================
 # CONFIG
 # ==============================
@@ -26,6 +29,7 @@ HEADERS: List[str] = [
     "FILE NAME",
     "SHAPE",
     "IMAGE HASH KEY",
+    "IMAGE URL",
 ]
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -77,6 +81,13 @@ def get_gs_client() -> gspread.Client:
     return gspread.authorize(creds)
 
 
+cloudinary.config(
+    cloud_name=st.secrets["cloudinary"]["cloud_name"],
+    api_key=st.secrets["cloudinary"]["api_key"],
+    api_secret=st.secrets["cloudinary"]["api_secret"]
+)
+
+
 def ensure_spreadsheet_and_headers(client: gspread.Client) -> Tuple[gspread.Spreadsheet, gspread.Worksheet]:
     try:
         sh = client.open(SHEET_TITLE)
@@ -86,7 +97,6 @@ def ensure_spreadsheet_and_headers(client: gspread.Client) -> Tuple[gspread.Spre
 
     existing_headers = ws.row_values(1)
     if existing_headers != HEADERS:
-        ws.resize(1)
         ws.update("A1", [HEADERS])
     return sh, ws
 
@@ -113,6 +123,40 @@ def compute_image_hash(file_bytes: bytes) -> str:
     with Image.open(io.BytesIO(file_bytes)) as img:
         ahash = imagehash.average_hash(img)
     return str(ahash)
+
+
+def upload_to_cloudinary_if_needed(df, ws, file_bytes, file_name, img_hash):
+    # Check existing by hash
+    existing = find_by_hash(df, img_hash)
+
+    if existing is not None:
+        existing_url = existing.get("IMAGE URL", "")
+        if existing_url:
+            return existing_url
+
+    try:
+        result = cloudinary.uploader.upload(
+            file_bytes,
+            public_id=img_hash,   # prevents duplicates
+            overwrite=False
+        )
+        image_url = result["secure_url"]
+
+        # Update old record if exists
+        if existing is not None:
+            row_number = int(existing["_ROW_NUMBER"])
+            ws.update_cell(
+                row_number,
+                HEADERS.index("IMAGE URL") + 1,
+                image_url
+            )
+
+        return image_url
+
+    except Exception as e:
+        st.error("Cloudinary upload failed")
+        st.exception(e)
+        return ""
 
 # ==============================
 # BUSINESS LOGIC
@@ -191,7 +235,21 @@ def append_row(ws: gspread.Worksheet, row_dict: Dict[str, str]) -> None:
 
 def show_record_table(record: pd.Series):
     df_display = pd.DataFrame([record[HEADERS].to_dict()])
-    st.dataframe(df_display, use_container_width=True)
+   # Convert IMAGE URL into clickable + download link
+    if "IMAGE URL" in df_display.columns:
+        def make_clickable(url):
+            if url:
+                return f'<a href="{url}" target="_blank">🔗 View</a> | <a href="{url}" download>⬇ Download</a>'
+            return ""
+
+        df_display["IMAGE URL"] = df_display["IMAGE URL"].apply(make_clickable)
+
+        st.write(
+            df_display.to_html(escape=False, index=False),
+            unsafe_allow_html=True
+        )
+    else:
+        st.dataframe(df_display, use_container_width=True)
 
 def skull_trait_radio(title: str, male_label: str, female_label: str, default: str = ""):
     st.markdown(f"### {title}")
@@ -306,6 +364,7 @@ def render_create_or_edit_form(*, mode: str, ws: gspread.Worksheet, df: pd.DataF
         "FILE NAME": file_name if file_name else defaults.get("FILE NAME", ""),
         "SHAPE": shape,
         "IMAGE HASH KEY": image_hash_key,
+        "IMAGE URL": defaults.get("IMAGE URL", ""),
     }
 
     if is_create:
@@ -432,11 +491,13 @@ def main():
     file_name = st.session_state["uploaded_name"]
     bytes_data = st.session_state["uploaded_bytes"]
     img_hash = compute_image_hash(bytes_data)
+    image_url = upload_to_cloudinary_if_needed(df, ws, bytes_data, file_name, img_hash)
 
     # If sheet has no rows yet
     if df.empty:
         st.subheader("Create First Entry")
-        defaults = {"FILE NAME": file_name, "IMAGE HASH KEY": img_hash}
+        # defaults = {"FILE NAME": file_name, "IMAGE HASH KEY": img_hash}
+        defaults = { "FILE NAME": file_name,"IMAGE HASH KEY": img_hash,"IMAGE URL": image_url }
         render_create_or_edit_form(mode="create", ws=ws, df=df, defaults=defaults)
         return
 
@@ -458,8 +519,8 @@ def main():
 
     # Try by FILE NAME
     row_by_name = find_by_filename(df, file_name)
+
     if row_by_name is not None:
-        # st.success("Found a match by FILE NAME.")
         row_number = int(row_by_name["_ROW_NUMBER"])
 
         # Ensure hash is saved
@@ -470,6 +531,14 @@ def main():
                 payload.setdefault(h, "")
             update_row(ws, row_number, payload)
             st.info("No hash found in sheet for this file. Computed and saved IMAGE HASH KEY.")
+            df = read_df(ws)
+            row_by_name = find_by_filename(df, file_name)
+
+        # ✅ Auto-update IMAGE URL if missing
+        if not row_by_name.get("IMAGE URL"):
+            image_url = upload_to_cloudinary_if_needed(
+                df, ws, bytes_data, file_name, img_hash
+            )
             df = read_df(ws)
             row_by_name = find_by_filename(df, file_name)
 
@@ -485,15 +554,28 @@ def main():
 
         if st.button("✎ Edit this record"):
             st.session_state.editing_row_number = row_number
-            st.session_state.editing_defaults = {col: str(row_by_name.get(col, "")) for col in HEADERS}
+            st.session_state.editing_defaults = {
+                col: str(row_by_name.get(col, "")) for col in HEADERS
+            }
             st.rerun()
+
         return
+
 
     # Try by HASH
     row_by_hash = find_by_hash(df, img_hash)
+
     if row_by_hash is not None:
         st.success("Found a match by IMAGE HASH KEY (duplicate image with different name/location).")
         row_number = int(row_by_hash["_ROW_NUMBER"])
+
+        # ✅ Auto-update IMAGE URL if missing
+        if not row_by_hash.get("IMAGE URL"):
+            image_url = upload_to_cloudinary_if_needed(
+                df, ws, bytes_data, file_name, img_hash
+            )
+            df = read_df(ws)
+            row_by_hash = find_by_hash(df, img_hash)
 
         prediction = predict_sex_from_shape(row_by_hash.get("SHAPE", ""))
         if prediction:
@@ -506,16 +588,21 @@ def main():
 
         if st.button("✎ Edit this record"):
             st.session_state.editing_row_number = row_number
-            st.session_state.editing_defaults = {col: str(row_by_hash.get(col, "")) for col in HEADERS}
+            st.session_state.editing_defaults = {
+                col: str(row_by_hash.get(col, "")) for col in HEADERS
+            }
             st.rerun()
+
         return
+
 
     # No match → create new entry
     st.warning("No match found by FILE NAME or IMAGE HASH KEY. Please create a new entry.")
-    defaults = {"FILE NAME": file_name, "IMAGE HASH KEY": img_hash}
+    defaults = {
+        "FILE NAME": file_name,
+        "IMAGE HASH KEY": img_hash
+    }
     render_create_or_edit_form(mode="create", ws=ws, df=df, defaults=defaults)
-
-
 
 if __name__ == "__main__":
     main()
