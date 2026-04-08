@@ -33,7 +33,7 @@ Foramen-Magnum-Metrics-for-Forensic-Sex-Estimation
 
 # Make sure:
 
-google_credentials.json is in the same folder
+google_credentials and cloudinary in the .streamlit/secrets.toml and should not commit in gihub and add in .gitignore file. 
 
 Google Sheets & Drive APIs are enabled
 
@@ -48,7 +48,9 @@ You’ll see output like:
     Local URL: http://localhost:8501
 
 
-# deployed on streamlit cloud
+# deployed on streamlit cloud :
+live url:
+    https://foramen-magnum-metrics.streamlit.app/
 
 
 
