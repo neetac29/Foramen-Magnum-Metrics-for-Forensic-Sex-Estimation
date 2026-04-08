@@ -1,7 +1,5 @@
-# Mandible-SHAPE-Based-Sex-Estimation
-mandible shape-based sex estimation tool
-
-
+# FORAMEN-MAGNUM-METRICS-FOR-FORENSIC-SEX-ESTIMATION
+Foramen-Magnum-Metrics-for-Forensic-Sex-Estimation
 
 # Steps to Run App on local 
 1. Delete the broken virtual environment
@@ -30,7 +28,7 @@ mandible shape-based sex estimation tool
 
     pip install -r requirements.txt
 
-6. Google credentials setup (local run)
+
 
 
 # Make sure:
